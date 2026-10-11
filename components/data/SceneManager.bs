@@ -98,10 +98,11 @@ sub pushScene(newGroup)
 
         end if
 
-        ' If we are moving in to a movie detail view, reset preferred audio track index
+        ' If we are moving in to a movie detail view, reset preferred audio and subtitle tracks
         if isDetailScreen(newGroup)
             m.global.queueManager.callFunc("setPreferredAudioTrackIndex", -1)
             m.global.queueManager.callFunc("setPreferredAudioTrackName", string.EMPTY)
+            m.global.queueManager.callFunc("setPreferredSubtitleTrack", {})
         end if
 
         m.groups.push(newGroup)
@@ -186,10 +187,11 @@ sub popScene()
     if isValid(group)
         registerOverhangData(group)
 
-        ' If we are moving back to anything other than a movie detail view, reset preferred audio track index
+        ' If we are moving back to anything other than a movie detail view, reset preferred audio and subtitle tracks
         if not isDetailScreen(group)
             m.global.queueManager.callFunc("setPreferredAudioTrackIndex", -1)
             m.global.queueManager.callFunc("setPreferredAudioTrackName", string.EMPTY)
+            m.global.queueManager.callFunc("setPreferredSubtitleTrack", {})
         end if
 
         group.visible = true

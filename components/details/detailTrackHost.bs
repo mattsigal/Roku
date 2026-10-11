@@ -71,10 +71,11 @@ sub SetUpAudioOptions(streams)
     streams = detailMediaStreams(streams)
 
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
-    selectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NOTSET
-
-    if selectedSubtitle = SubtitleSelection.NOTSET
-        selectedSubtitle = trackLabels.ResolveBestSubtitleIndex(streams, m.global.session.user.settings)
+    if isChainValid(preferredSubtitle, "StreamIndex")
+        selectedSubtitle = preferredSubtitle.StreamIndex
+    else
+        ' Without a pick of the viewer's own, the track playback will turn on shows as chosen
+        selectedSubtitle = trackLabels.PreferredSubtitle(streams, detailServerSubtitleIndex(), m.global.session.user.settings)
     end if
 
     audioTracks = []
@@ -102,6 +103,22 @@ sub SetUpAudioOptions(streams)
     m.trackData.audios = audioTracks
     m.trackData.subtitles = subtitleTracks
 end sub
+
+' The item carries the same default subtitle PlaybackInfo gives for the chosen version
+function detailServerSubtitleIndex() as integer
+    sources = detailMediaSources(chainLookup(m.top, "itemContent.json.MediaSources"))
+    if sources.Count() = 0 then return SubtitleSelection.NONE
+
+    source = sources[0]
+    for each candidate in sources
+        if isStringEqual(candidate.LookupCI("Id"), m.top.selectedVideoStreamId)
+            source = candidate
+            exit for
+        end if
+    end for
+
+    return source.LookupCI("DefaultSubtitleStreamIndex") ?? SubtitleSelection.NONE
+end function
 
 sub SetCurrentVideoCodec(itemData)
     if not isValidAndNotEmpty(chainLookup(itemData, "mediaStreams")) then return

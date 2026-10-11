@@ -4719,6 +4719,7 @@
             "title": "Prefer Text Subtitles",
             "description": "Automatically prefer text-based subtitle tracks (such as SRT, VTT, or ASS) over bitmap subtitles (such as PGS or VobSub).",
             "settingName": "playback.preferTextSubtitles",
+            "glyph": "text_fields",
             "type": "bool",
             "default": "false"
           },
@@ -4726,6 +4727,7 @@
             "title": "Prefer External Subtitles",
             "description": "Automatically prefer external subtitle files over embedded subtitle streams.",
             "settingName": "playback.preferExternalSubtitles",
+            "glyph": "description_outlined",
             "type": "bool",
             "default": "false"
           },

@@ -27,8 +27,7 @@ sub onVisibleChanged()
     if m.top.visible then m.subtitleMenu.setFocus(true)
 end sub
 
-' Subtitle tracks ordered by user preference scoring (language match, external/internal, text, SDH).
-' The None track is always kept at index 0.
+' None stays first, and the tracks follow in the order the viewer's settings score them
 function orderedTracks(tracks as object) as object
     noneTracks = []
     selectableTracks = []
@@ -44,16 +43,9 @@ function orderedTracks(tracks as object) as object
     end for
 
     selectableTracks.sortBy("score", "r")
+    noneTracks.append(selectableTracks)
 
-    result = []
-    for each track in noneTracks
-        result.push(track)
-    end for
-    for each track in selectableTracks
-        result.push(track)
-    end for
-
-    return result
+    return noneTracks
 end function
 
 sub subtitleTracksSet()

@@ -1,0 +1,106 @@
+sub testSubtitleSelection()
+    streams = [
+        { Type: "Video", Index: 0 },
+        { Type: "Subtitle", Index: 2, Language: "eng", Codec: "PGSSUB", IsTextSubtitleStream: false, IsDefault: true },
+        { Type: "Subtitle", Index: 3, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true },
+        { Type: "Subtitle", Index: 4, Language: "fre", Codec: "subrip", IsTextSubtitleStream: true },
+        { Type: "Subtitle", Index: 5, Language: "eng", Codec: "PGSSUB", IsTextSubtitleStream: false, IsForced: true },
+        { Type: "Subtitle", Index: 6, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true, IsForced: true, IsExternal: true },
+        { Type: "Subtitle", Index: 7, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true, IsExternal: true, Title: "English SDH", IsHearingImpaired: true },
+        { Type: "Subtitle", Index: 8, Language: "fra", Codec: "subrip", IsTextSubtitleStream: true, IsExternal: true },
+        { Type: "Subtitle", Index: 9, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true, Title: "Director's Commentary" },
+        { Type: "Subtitle", Index: 10, Language: "en", Codec: "subrip", IsTextSubtitleStream: true, IsExternal: true }
+    ]
+    noPrefs = { "playback.subs.language": "anyLanguage" }
+    preferText = { "playback.preferTextSubtitles": true }
+    preferExternal = { "playback.preferExternalSubtitles": "true" }
+    preferBoth = { "playback.preferTextSubtitles": true, "playback.preferExternalSubtitles": true }
+    preferSdh = { "playback.preferSdhSubtitles": true }
+
+    assertEqual(trackLabels.PreferredSubtitle(streams, 2, noPrefs), 2, "With every prefer setting off the server's own track plays")
+    assertEqual(trackLabels.PreferredSubtitle(streams, SubtitleSelection.NONE, preferBoth), SubtitleSelection.NONE, "A track the server left off stays off, so Default and Smart keep their meaning")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 42, preferBoth), 42, "A track missing from the list is left as the server gave it")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 2, preferText), 3, "Prefer text trades the English PGS for the English SRT, never the French one")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 2, preferExternal), 10, "Prefer external takes the English file, read as English though it's tagged en")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 2, preferBoth), 10, "Both settings land on the external English SRT")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 3, preferText), 3, "A tie keeps the server's track")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 5, preferText), 6, "A forced track is traded only for another forced track")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 4, preferExternal), 8, "French tagged fre in the file and fra on the external file are one language")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 3, preferSdh), 7, "Prefer SDH lifts the SDH track in the same language")
+    assertEqual(trackLabels.PreferredSubtitle(streams, 7, preferExternal), 7, "An SDH track stays SDH when only external is preferred")
+
+    commentaryOnly = [
+        { Type: "Subtitle", Index: 1, Language: "eng", Codec: "PGSSUB", IsDefault: true },
+        { Type: "Subtitle", Index: 2, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true, Title: "Commentary" }
+    ]
+    assertEqual(trackLabels.PreferredSubtitle(commentaryOnly, 1, preferText), 1, "A commentary track is never swapped in for the dialogue")
+
+    bitmapSdh = [
+        { Type: "Subtitle", Index: 1, Language: "eng", Codec: "subrip", IsTextSubtitleStream: true },
+        { Type: "Subtitle", Index: 2, Language: "eng", Codec: "PGSSUB", IsHearingImpaired: true }
+    ]
+    assertEqual(trackLabels.PreferredSubtitle(bitmapSdh, 1, preferSdh), 2, "Prefer SDH can take a picture SDH track")
+    assertEqual(trackLabels.PreferredSubtitle(bitmapSdh, 1, { "playback.preferSdhSubtitles": true, "playback.subs.onlytext": true }), 1, "Only Text keeps it on the text track")
+
+    untagged = [
+        { Type: "Subtitle", Index: 1, Codec: "PGSSUB" },
+        { Type: "Subtitle", Index: 2, Codec: "subrip", IsTextSubtitleStream: true }
+    ]
+    assertEqual(trackLabels.PreferredSubtitle(untagged, 1, preferText), 1, "An untagged track could be any language, so it's kept")
+
+    assertEqual(trackLabels.LanguageKey("fre"), "fra", "The bibliographic French code reads as fra")
+    assertEqual(trackLabels.LanguageKey("FR"), "fra", "The two letter code reads as fra")
+    assertEqual(trackLabels.LanguageKey("ger"), "deu", "German tagged ger reads as deu")
+    assertEqual(trackLabels.LanguageKey("eng"), "eng", "A settings code stays as it is")
+    assertEqual(trackLabels.LanguageKey("pt-BR"), "pob", "Brazilian Portuguese keeps its own code")
+    assertEqual(trackLabels.LanguageKey("pol") = trackLabels.LanguageKey("por"), false, "Polish and Portuguese are different languages")
+
+    polish = { "playback.subs.language": "pol" }
+    assertEqual(trackLabels.ScoreSubtitle({ Language: "pol" }, polish) > trackLabels.ScoreSubtitle({ Language: "por", IsDefault: true }, polish), true, "A Polish viewer gets Polish ahead of a flagged Portuguese track")
+    assertEqual(trackLabels.ScoreSubtitle({ Language: "slv" }, { "playback.subs.language": "slk" }) < 10000, true, "Slovenian isn't taken for Slovak")
+    assertEqual(trackLabels.ScoreSubtitle({ Language: "fre" }, { "playback.subs.language": "fra" }) >= 10000, true, "A French track tagged fre matches the French setting")
+    english = { "playback.subs.language": "eng" }
+    assertEqual(trackLabels.ScoreSubtitle({ Language: "eng", IsExternal: true }, english) > trackLabels.ScoreSubtitle({ Language: "nqo", IsDefault: true }, english), true, "The viewer's language outranks an internal flagged track")
+    assertEqual(trackLabels.ScoreSubtitle({ Language: "eng", Track: { Description: "English SDH" } }, preferSdh) > trackLabels.ScoreSubtitle({ Language: "eng" }, preferSdh), true, "The player's tracks read SDH from their description")
+
+    savedGlobal = m.global
+    savedTop = m.top
+    savedTrackData = m.trackData
+    m.global = {
+        queueManager: { preferred: {}, callFunc: testSubtitleQueueCall },
+        session: { user: { settings: preferText } }
+    }
+    m.trackData = {}
+    m.top = {
+        selectedAudioStreamIndex: -1,
+        selectedVideoStreamId: "b",
+        itemContent: { json: { MediaSources: [{ Id: "a", DefaultSubtitleStreamIndex: 4 }, { Id: "b", DefaultSubtitleStreamIndex: 2 }] } }
+    }
+    SetUpAudioOptions(streams)
+    assertEqual(testSelectedSubtitleRow(), 3, "The details picker shows the server's track after the prefer settings, for the chosen version")
+    assertEqual(m.trackData.subtitles[1].StreamIndex, 2, "Each row carries the server's index for its stream")
+
+    m.global.session.user.settings = noPrefs
+    m.top.itemContent = { json: { MediaSources: [{ Id: "b" }] } }
+    SetUpAudioOptions(streams)
+    assertEqual(testSelectedSubtitleRow(), SubtitleSelection.NONE, "No default track from the server shows None")
+
+    m.global.queueManager.preferred = { StreamIndex: 8 }
+    SetUpAudioOptions(streams)
+    assertEqual(testSelectedSubtitleRow(), 8, "The viewer's own pick wins over the prediction")
+    m.global = savedGlobal
+    m.top = savedTop
+    m.trackData = savedTrackData
+end sub
+
+function testSubtitleQueueCall(name as string) as dynamic
+    if name = "getPreferredSubtitleTrack" then return m.preferred
+    return invalid
+end function
+
+function testSelectedSubtitleRow() as integer
+    for each row in m.trackData.subtitles
+        if row.Selected then return row.StreamIndex
+    end for
+    return -99
+end function

@@ -49,10 +49,12 @@ sub clear()
         setPreferredAudioTrackIndex(-1)
         setPreferredAudioTrackName(string.EMPTY)
     end if
-    m.bypassNextPreferredAudioTrackIndexReset = false
-    if not m.bypassNextPreferredSubtitleTrackReset
+    ' A play that keeps the audio pick keeps the subtitle pick too. Detail screens pass their audio
+    ' pick on the item, so they keep the subtitle pick on its own
+    if not m.bypassNextPreferredAudioTrackIndexReset and not m.bypassNextPreferredSubtitleTrackReset
         m.preferredSubtitleTrack = {}
     end if
+    m.bypassNextPreferredAudioTrackIndexReset = false
     m.bypassNextPreferredSubtitleTrackReset = false
 end sub
 

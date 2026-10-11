@@ -1046,6 +1046,7 @@ sub onModalChapterChosen(event as object)
     itemContent.startingPoint = event.getData()
     selectPlaybackSource(itemContent, m.top.selectedVideoStreamId)
     itemContent.selectedAudioStreamIndex = m.top.selectedAudioStreamIndex
+    m.global.queueManager.callFunc("bypassNextPreferredSubtitleTrackReset")
     m.global.queueManager.callFunc("clear")
     m.global.queueManager.callFunc("push", itemContent)
     m.global.queueManager.callFunc("playQueue")

@@ -66,8 +66,9 @@ const selections = {
     'source/utils/ratingSourceList.bs': null,
     'source/utils/libraryOrder.bs': null,
     'source/utils/detailSectionLayout.bs': null,
+    'source/utils/trackLabels.bs': null,
     'components/extras/collectionLookup.bs': ['findParents', 'namedCollection', 'namedFirst', 'membership'],
-    'components/details/detailTrackHost.bs': ['SetUpVideoOptions', 'audioOrdinal', 'audioStreamPosition'],
+    'components/details/detailTrackHost.bs': ['SetUpVideoOptions', 'SetUpAudioOptions', 'detailServerSubtitleIndex', 'audioOrdinal', 'audioStreamPosition'],
     'source/enums/VideoType.bs': null,
     'source/enums/MediaStreamType.bs': null,
     'source/enums/PlaybackMethod.bs': null,
@@ -82,7 +83,7 @@ const selections = {
     'components/ItemGrid/LoadItemsTask2.bs': ['getTargetImageURL', 'getTargetServerUrl', 'isUsingRemoteServer'],
     'source/api/userauth.bs': ['passwordLoginRequest', 'validPasswordLogin', 'passwordLoginError'],
     'source/utils/config.bs': ['current_user_id', 'get_user_setting'],
-    'source/utils/misc.bs': ['isLocalhost', 'isSupportedMediaServer', 'urlCandidates', 'isValid', 'isAllValid', 'isStringEqual', 'isChainValid', 'chainLookupReturn', 'chainLookup', 'isValidAndNotEmpty', 'serverVersionMeetsMinimumRequirements', 'playlistRenumbersAfterDelete', 'toString', 'getHomeBackdropBlurAmount', 'inArray', 'guidKey', 'isString'],
+    'source/utils/misc.bs': ['isLocalhost', 'isSupportedMediaServer', 'urlCandidates', 'isValid', 'isAllValid', 'isStringEqual', 'isChainValid', 'chainLookupReturn', 'chainLookup', 'isValidAndNotEmpty', 'serverVersionMeetsMinimumRequirements', 'playlistRenumbersAfterDelete', 'toString', 'getHomeBackdropBlurAmount', 'inArray', 'guidKey', 'isString', 'toBoolean'],
     'source/ShowScenes.bs': ['ServerVersionCheck', 'startDetailExtras'],
     'source/utils/multiserver.bs': ['buildURLForSession', 'buildImageURLForServer', 'librariesByServer'],
     'source/api/Items.bs': ['ItemMetaData', 'playbackDeviceProfile', 'asksForServerStream'],
@@ -150,6 +151,7 @@ source += '\n' + await readFile('test/settings-sync-values.bs', 'utf8');
 source += '\n' + await readFile('test/settings-sync-profile.bs', 'utf8');
 source += '\n' + await readFile('test/seasonal-effects.bs', 'utf8');
 source += '\n' + await readFile('test/audio-track.bs', 'utf8');
+source += '\n' + await readFile('test/subtitle-selection.bs', 'utf8');
 const achievementsModelFile = await readFile('source/utils/achievementsModel.bs', 'utf8');
 source += '\nnamespace achievementsModel\n';
 for (const name of [
@@ -437,6 +439,21 @@ for (const detailStyle of detailStyles) {
     assert.match(detailSource, /subtitleDownloadDialog\.observeField\("downloadedIndex", "onSubtitleDownloaded"\)/, `${detailStyle} picks up a downloaded subtitle`);
 }
 process.stdout.write(`PASS: detail track pickers (${detailStyles.length * 2} checks)\n`);
+
+// A subtitle pick lasts as long as the audio pick, and a chapter played from details keeps it.
+const queueClear = (await readFile('components/manager/QueueManager.bs', 'utf8')).match(/^sub clear\(\)[^]*?^end sub/m)[0];
+assert.match(queueClear, /if not m\.bypassNextPreferredAudioTrackIndexReset and not m\.bypassNextPreferredSubtitleTrackReset\s+m\.preferredSubtitleTrack = \{\}/, 'Clearing the queue keeps the subtitle pick wherever it keeps the audio pick');
+const sceneManagerSource = await readFile('components/data/SceneManager.bs', 'utf8');
+const pickResets = sceneManagerSource.match(/callFunc\("setPreferredAudioTrackIndex", -1\)\s+m\.global\.queueManager\.callFunc\("setPreferredAudioTrackName", string\.EMPTY\)\s+m\.global\.queueManager\.callFunc\("setPreferredSubtitleTrack", \{\}\)/g) ?? [];
+assert.equal(pickResets.length, 2, 'Entering a details screen or leaving to anything else resets the subtitle pick with the audio pick');
+const chapterPlays = { ModernItemDetails: 'onChapterSelected', NouveauItemDetails: 'playFromChapter', SpotlightItemDetails: 'onModalChapterChosen' };
+for (const [detailStyle, handler] of Object.entries(chapterPlays)) {
+    const body = (await readFile(`components/details/${detailStyle}.bs`, 'utf8')).match(new RegExp(`^sub ${handler}\\([^]*?^end sub`, 'm'))[0];
+    assert.match(body, /callFunc\("bypassNextPreferredSubtitleTrackReset"\)\s+m\.global\.queueManager\.callFunc\("clear"\)/, `${detailStyle} keeps the subtitle pick when a chapter plays`);
+}
+const loadVideoSource = await readFile('components/ItemGrid/LoadVideoContentTask.bs', 'utf8');
+assert.match(loadVideoSource, /shouldBurnInSubtitle\(video\.SelectedSubtitle\)\s+m\.playbackInfo = getPlaybackInfo\(video\.id, mediaSourceId, audio_stream_idx, requestedSubtitleIndex,/, 'A burn in asks the server for the track that will play');
+process.stdout.write(`PASS: subtitle pick lifetime (${Object.keys(chapterPlays).length + 3} checks)\n`);
 
 // A card left in a selection field opens again when a favorite or watched change rewrites it, and
 // that rewrite has to leave the card's type alone.
